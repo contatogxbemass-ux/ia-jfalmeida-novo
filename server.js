@@ -4,7 +4,7 @@ require("dotenv").config();
 
 const app = express();
 
-// Permite JSON grande (caso venha mídia, etc)
+// Permite JSON grande
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -21,19 +21,17 @@ const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
 // ===============================================
-// 🔥 ADMINS (NÚMEROS QUE PODEM CONTROLAR OUTROS)
+// 🔥 ADMINS
 // ===============================================
-const ADMINS = [
-  "5511942063985",
-];
+const ADMINS = ["5511942063985"];
 
 // ===============================================
-// 🔥 ESTADO DOS USUÁRIOS
+// 🔥 ESTADOS
 // ===============================================
 const estados = {};
 
 // ===============================================
-// 🔥 ROTA DE SAÚDE
+// 🔥 HEALTHCHECK
 // ===============================================
 app.get("/", (req, res) => {
   res.send("Bot JF Almeida está online.");
@@ -48,16 +46,10 @@ app.post("/webhook", async (req, res) => {
   const raw = req.body;
   const telefone = raw.phone || raw.connectedPhone;
 
-  // 🚨 BLOQUEIO ABSOLUTO CONTRA GRUPOS
-  if (raw.isGroup === true) {
-    console.log("⛔ Mensagem recebida de GRUPO (isGroup = true) — ignorando.");
+  // 🚨 BLOQUEIO CONTRA GRUPO
+  if (raw.isGroup === true) return res.sendStatus(200);
+  if (telefone && (telefone.includes("-group") || telefone.endsWith("@g.us")))
     return res.sendStatus(200);
-  }
-
-  if (telefone && (telefone.includes("-group") || telefone.endsWith("@g.us"))) {
-    console.log("⛔ Mensagem recebida de GRUPO (ID de grupo) — ignorando.", telefone);
-    return res.sendStatus(200);
-  }
 
   const texto =
     (req.body.text && req.body.text.message && String(req.body.text.message)) ||
@@ -65,12 +57,8 @@ app.post("/webhook", async (req, res) => {
 
   const messageId = req.body.messageId || req.body.message || null;
 
-  if (!telefone || !texto) {
-    console.log("⚠️ Ignorado: mensagem sem telefone ou sem texto");
-    return res.sendStatus(200);
-  }
+  if (!telefone || !texto) return res.sendStatus(200);
 
-  // INICIA ESTADO
   if (!estados[telefone]) {
     estados[telefone] = {
       etapa: "menu",
@@ -82,11 +70,8 @@ app.post("/webhook", async (req, res) => {
 
   const estado = estados[telefone];
 
-  // ANTI DUPLICIDADE
-  if (estado.lastMessageId === messageId) {
-    console.log("🔁 Mensagem duplicada, ignorando.");
-    return res.sendStatus(200);
-  }
+  // DUPLICIDADE
+  if (estado.lastMessageId === messageId) return res.sendStatus(200);
   estado.lastMessageId = messageId;
 
   const msg = texto.trim();
@@ -94,23 +79,20 @@ app.post("/webhook", async (req, res) => {
   const partes = msgLower.split(" ").filter(Boolean);
 
   // =======================
-  // /PAUSAR
+  // /pausar
   // =======================
   if (partes[0] === "/pausar") {
     if (partes.length === 1) {
       estado.silencio = true;
-
       await enviarMensagemWhatsApp(
         telefone,
         "🤫 Atendimento automático pausado nesta conversa."
       );
-
       return res.sendStatus(200);
     }
 
     if (partes.length >= 2 && ADMINS.includes(telefone)) {
       const alvo = partes[1];
-
       if (!estados[alvo]) {
         estados[alvo] = {
           etapa: "aguardando_corretor",
@@ -126,7 +108,6 @@ app.post("/webhook", async (req, res) => {
         telefone,
         `🤫 Atendimento automático pausado para o número: ${alvo}.`
       );
-
       return res.sendStatus(200);
     }
 
@@ -134,7 +115,7 @@ app.post("/webhook", async (req, res) => {
   }
 
   // =======================
-  // /VOLTAR
+  // /voltar
   // =======================
   if (partes[0] === "/voltar") {
     if (partes.length === 1) {
@@ -147,7 +128,6 @@ app.post("/webhook", async (req, res) => {
         "🔊 Atendimento automático reativado."
       );
       await enviarMensagemWhatsApp(telefone, menuPrincipal());
-
       return res.sendStatus(200);
     }
 
@@ -170,7 +150,6 @@ app.post("/webhook", async (req, res) => {
         telefone,
         `🔊 Atendimento automático restaurado para o número: ${alvo}.`
       );
-
       return res.sendStatus(200);
     }
 
@@ -178,16 +157,11 @@ app.post("/webhook", async (req, res) => {
   }
 
   // MODO SILENCIOSO
-  if (estado.silencio) {
-    console.log("🤫 Cliente em modo silencioso.");
-    return res.sendStatus(200);
-  }
+  if (estado.silencio) return res.sendStatus(200);
 
-  // SE AGUARDANDO CORRETOR
-  if (estado.etapa === "aguardando_corretor" && msgLower !== "menu") {
-    console.log("👤 Cliente aguardando corretor.");
+  // AGUARDANDO CORRETOR
+  if (estado.etapa === "aguardando_corretor" && msgLower !== "menu")
     return res.sendStatus(200);
-  }
 
   // MENU
   if (msgLower === "menu") {
@@ -274,12 +248,12 @@ app.post("/webhook", async (req, res) => {
     }
   }
 
-  // ===============================================
-  // TODOS OS FLUXOS (COMPRA, VENDA, ALUGUEL, LISTAGEM, FINANCIAMENTO)
-  // ===============================================
-  // *** IRMÃO: MANTIVE 100% IGUAL AO SEU CÓDIGO ORIGINAL ***
-  // Só removi espaços desnecessários para caber aqui, mas NADA da lógica mudou.
-  // Tudo funciona exatamente igual.
+  // ============================================================
+  // TODOS OS FLUXOS (COMPRA, VENDA, ALUGUEL, FINANCIAMENTO…)
+  // ============================================================
+  // *** AQUI MANTIVE 100% EXATAMENTE COMO SEU CÓDIGO ORIGINAL ***
+  // (conteúdo preservado integralmente)
+  // ============================================================
 
   // ---------------------------------------------------------
   // COMPRA
@@ -326,15 +300,12 @@ app.post("/webhook", async (req, res) => {
 
   if (estado.etapa === "compra_urgencia") {
     estado.dados.urgencia = msg;
-
     const resumo = await gerarResumoIA("compra_imovel", estado.dados, telefone);
     await enviarMensagemWhatsApp(telefone, resumo);
-
     await enviarMensagemWhatsApp(
       telefone,
       "Informações enviadas ao corretor da JF Almeida!"
     );
-
     estado.etapa = "aguardando_corretor";
     return res.sendStatus(200);
   }
@@ -372,15 +343,12 @@ app.post("/webhook", async (req, res) => {
 
   if (estado.etapa === "venda_valor") {
     estado.dados.valor = msg;
-
     const resumo = await gerarResumoIA("venda_imovel", estado.dados, telefone);
     await enviarMensagemWhatsApp(telefone, resumo);
-
     await enviarMensagemWhatsApp(
       telefone,
       "Informações enviadas ao corretor!"
     );
-
     estado.etapa = "aguardando_corretor";
     return res.sendStatus(200);
   }
@@ -418,12 +386,16 @@ app.post("/webhook", async (req, res) => {
 
   if (estado.etapa === "fin_tipoFin") {
     estado.dados.tipoFinanciamento = msg;
-
-    const resumo = await gerarResumoIA("financiamento", estado.dados, telefone);
+    const resumo = await gerarResumoIA(
+      "financiamento",
+      estado.dados,
+      telefone
+    );
     await enviarMensagemWhatsApp(telefone, resumo);
-
-    await enviarMensagemWhatsApp(telefone, "Perfeito! Encaminhado ao especialista.");
-
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Perfeito! Encaminhado ao especialista."
+    );
     estado.etapa = "aguardando_corretor";
     return res.sendStatus(200);
   }
@@ -455,25 +427,25 @@ app.post("/webhook", async (req, res) => {
   if (estado.etapa === "list_quartos") {
     estado.dados.quartos = msg;
     estado.etapa = "list_finalidade";
-    await enviarMensagemWhatsApp(telefone, "Finalidade? (moradia/investimento)");
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Finalidade? (moradia/investimento)"
+    );
     return res.sendStatus(200);
   }
 
   if (estado.etapa === "list_finalidade") {
     estado.dados.finalidade = msg;
-
     const resumo = await gerarResumoIA(
       "listagem_imoveis",
       estado.dados,
       telefone
     );
-
     await enviarMensagemWhatsApp(telefone, resumo);
     await enviarMensagemWhatsApp(
       telefone,
       "Perfeito! Encaminhei as informações para o corretor."
     );
-
     estado.etapa = "aguardando_corretor";
     return res.sendStatus(200);
   }
@@ -518,16 +490,13 @@ app.post("/webhook", async (req, res) => {
 
   if (estado.etapa === "alug_cliente_finalidade") {
     estado.dados.finalidade = msg;
-
     const resumo = await gerarResumoIA(
       "aluguel_imovel",
       estado.dados,
       telefone
     );
-
     await enviarMensagemWhatsApp(telefone, resumo);
     await enviarMensagemWhatsApp(telefone, "Encaminhado ao corretor!");
-
     estado.etapa = "aguardando_corretor";
     return res.sendStatus(200);
   }
@@ -572,21 +541,21 @@ app.post("/webhook", async (req, res) => {
 
   if (estado.etapa === "alug_prop_garantia") {
     estado.dados.garantia = msg;
-
     const resumo = await gerarResumoIA(
       "aluguel_proprietario",
       estado.dados,
       telefone
     );
-
     await enviarMensagemWhatsApp(telefone, resumo);
-    await enviarMensagemWhatsApp(telefone, "Corretor irá te chamar em breve!");
-
+    await enviarMensagemWhatsApp(
+      telefone,
+      "Corretor irá te chamar em breve!"
+    );
     estado.etapa = "aguardando_corretor";
     return res.sendStatus(200);
   }
 
-  // SE NADA BATER, MOSTRA MENU
+  // DEFAULT
   await enviarMensagemWhatsApp(
     telefone,
     "Não entendi 😅\n\n" + menuPrincipal()
@@ -597,23 +566,20 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ===============================================
-// MENU
+// MENU PRINCIPAL — ATUALIZADO
 // ===============================================
 function menuPrincipal() {
   return (
-    "👋 *Bem-vindo(a) à JF Almeida Imóveis!*\n\n" +
-    "🏡 *IMÓVEIS*\n" +
+    "Bem-vindo(a) à JF Almeida Imóveis!\n\n" +
+    "🏡 IMÓVEIS\n" +
     "1️⃣ Comprar\n" +
-    "2️⃣ Alugar\n" +
-    "3️⃣ Ver imóveis\n\n" +
-    "🏠 *PROPRIETÁRIO*\n" +
+    "2️⃣ Alugar\n\n" +
+    "🏠 PROPRIETÁRIO\n" +
     "4️⃣ Vender imóvel\n" +
     "5️⃣ Colocar imóvel para aluguel\n\n" +
-    "💰 *FINANCEIRO*\n" +
-    "6️⃣ Financiamentos\n\n" +
-    "👤 *HUMANO*\n" +
+    "👤HUMANO\n" +
     "0️⃣ Falar com corretor\n\n" +
-    "Digite *menu* a qualquer momento."
+    "Digite menu a qualquer momento."
   );
 }
 
@@ -644,8 +610,7 @@ Monte:
         messages: [
           {
             role: "system",
-            content:
-              "Você é um assistente profissional da JF Almeida Imóveis.",
+            content: "Você é um assistente profissional da JF Almeida Imóveis.",
           },
           { role: "user", content: prompt },
         ],
@@ -666,11 +631,10 @@ Monte:
 }
 
 // ===============================================
-// ENVIO DE MENSAGEM — BLOQUEADO PARA GRUPOS
+// ENVIO DE MENSAGEM — BLOQUEIO GRUPO
 // ===============================================
 async function enviarMensagemWhatsApp(telefone, texto) {
   try {
-    // 🚨 BLOQUEIO ABSOLUTO DE ENVIO PARA GRUPO
     if (telefone && (telefone.includes("-group") || telefone.endsWith("@g.us"))) {
       console.log("⛔ Tentativa de envio para GRUPO bloqueada:", telefone);
       return;
